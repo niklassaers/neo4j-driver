@@ -3,8 +3,8 @@ import XCTest
 @testable import Fluent
 
 
-class SQLite3Tests: XCTestCase {
-    static var allTests: [(String, (SQLite3Tests) -> () throws -> Void)] {
+class Neo4jDriverTests: XCTestCase {
+    static var allTests: [(String, (Neo4jDriverTests) -> () throws -> Void)] {
         return [
            ("testSaveAndFind", testSaveAndFind)
         ]
@@ -14,10 +14,15 @@ class SQLite3Tests: XCTestCase {
     var database:Fluent.Database!
 
 
-    /*
     override func setUp() {
-        driver = Neo4jDriver.makeTestConnection()
+        do {
+            driver = try Neo4jDriver(host: "localhost", port: 7474, transferProtocol: .http, username: "neo4j", password: "stack0verFlow")
+        } catch {
+            XCTFail("Could not set up database \(error)")
+        }
+        
         database = Database(driver)
+        Atom.database = database
         do {
             try Post.revert(database)
             try Post.prepare(database)
@@ -26,7 +31,7 @@ class SQLite3Tests: XCTestCase {
             XCTFail("Could not create table \(error)")
         }
     }
- */
+ 
 
     func testSaveAndFind() {
 //        try! database.create("posts") { creator in

@@ -44,6 +44,7 @@ public class Neo4jDriver: Fluent.Driver {
 
         database.executeCypher(cypher, params: params) { (result, error) in
             
+            print("Running Cypher")
             dispatchGroup.leave()
         }
         
