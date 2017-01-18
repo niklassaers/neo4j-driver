@@ -1,10 +1,10 @@
 #if os(Linux)
 
 import XCTest
-@testable import FluentSQLiteTests
+@testable import FluentNeo4jTests
 
 XCTMain([
-    testCase(SQLite3Tests.allTests),
+    testCase(FluentNeo4jTests.allTests),
 ])
 
 #endif
