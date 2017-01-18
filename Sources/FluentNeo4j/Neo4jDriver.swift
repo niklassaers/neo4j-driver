@@ -36,7 +36,7 @@ public class Neo4jDriver: Fluent.Driver {
     @discardableResult
     public func query<T: Entity>(_ query: Query<T>) throws -> Fluent.Node {
         
-        let cypher = Neo4jSerializer.toCypher(query: query)
+        let cypher = try Neo4jSerializer.toCypher(query: query)
         let params = Neo4jSerializer.toParameters(query: query)
         
         let dispatchGroup = DispatchGroup()
