@@ -21,7 +21,7 @@ public class Neo4jSerializer {
         case .delete:
             return deleteCypherQuery(query: query)
         case .create:
-            return try createCypherQuery(query: query)
+            return try createCypherQuery(query: query, idKey: idKey)
         case .modify:
             return try modifyCypherQuery(query: query, idKey: idKey)
 
@@ -174,13 +174,13 @@ public class Neo4jSerializer {
         return condition
     }
 
-    private static func createCypherQuery<T: Entity>(query: Query<T>) throws -> [String] {
+    private static func createCypherQuery<T: Entity>(query: Query<T>, idKey: String) throws -> [String] {
         
-        var cypher = "CREATE (n:\(query.singularEntity) { "
+        var idValue = UUID().uuidString
+        var cypher = "CREATE (n:\(query.singularEntity) { \(idKey): '\(idValue)' "
 
         if let pairs = query.data?.object {
             
-            var first = true
             for (key, node) in pairs {
                 if key == "id" {
                     continue
@@ -201,15 +201,10 @@ public class Neo4jSerializer {
                     throw Error.notImplemented
                 }
                 
-                if first == false {
-                    cypher += ", \(firstPart)\(lastPart)"
-                } else {
-                    first = false
-                    cypher += "\(firstPart)\(lastPart)"
-                }
+                cypher += ", \(firstPart)\(lastPart)"
             }
         }
-        cypher += "})"
+        cypher += "}) RETURN n"
         
         return [cypher]
     }
