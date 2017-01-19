@@ -40,7 +40,7 @@ class SerializerTests: XCTestCase {
         let query = try Atom.query().filter("protons", .greaterThanOrEquals, 2)
         query.limit = Limit(count: 15)
         
-        let cypher = try Neo4jSerializer.toCypher(query: query)
+        let cypher = try Neo4jSerializer.toCypher(query: query, idKey: driver.idKey)
         print(cypher)
     }
     

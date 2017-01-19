@@ -11,7 +11,7 @@ public class Neo4jSerializer {
         case notImplemented
     }
     
-    public static func toCypher<T: Entity>(query: Query<T>) throws -> String {
+    public static func toCypher<T: Entity>(query: Query<T>, idKey: String) throws -> String {
         
         switch query.action {
         case .fetch:
@@ -23,28 +23,92 @@ public class Neo4jSerializer {
         case .create:
             return try createCypherQuery(query: query)
         case .modify:
-            return modifyCypherQuery(query: query)
+            return try modifyCypherQuery(query: query, idKey: idKey)
 
         }
 
     }
     
+    public static func toCypher(schema: Schema, idKey: String) throws -> String {
+        
+        
+        switch schema {
+        case let .create(entity, create):
+            let label = entity.pluralNameAsCapitalizedSingular()
+            var cypher = "CREATE INDEX ON :\(label)(\(idKey));\n"
+            cypher += "CREATE CONSTRAINT ON (n:\(label)) ASSERT n.\(idKey) IS UNIQUE;\n"
+
+            for field in create {
+                if field.unique == true {
+                    cypher += "CREATE CONSTRAINT ON (n:\(label)) ASSERT n.\(field.name) IS UNIQUE;\n"
+                }
+            }
+            
+            return cypher
+            
+        case let .modify(entity, create, delete):
+            let label = entity.pluralNameAsCapitalizedSingular()
+            var cypher = ""
+
+            /*
+             // I would have liked to remove constraints, but that leads to errors if they do not exist. I cannot query if they do exist already
+             // For now, I guess we should query what indexes we have first and then go on and delete based on that
+             
+            for field in delete {
+                if field.unique == true {
+                    cypher += "DROP CONSTRAINT ON (n:\(label)) ASSERT n.\(field.name) IS UNIQUE;\n"
+                }
+            }
+            */
+
+            for field in create {
+                if field.unique == true {
+                    cypher += "CREATE CONSTRAINT ON (n:\(label)) ASSERT n.\(field.name) IS UNIQUE;\n"
+                }
+            }
+            
+            return cypher
+            
+        case let .delete(entity):
+            let label = entity.pluralNameAsCapitalizedSingular()
+            var cypher = "MATCH (n:\(label)) DETACH DELETE n;\n"
+            cypher += "DROP INDEX ON :\(label)(\(idKey))"
+
+            return cypher
+        }
+    }
+    
     private static func fetchCypherQuery<T: Entity>(query: Query<T>) throws -> String {
         
-        var cypher = "MATCH (n:\(query.singularEntity)) WHERE "
+        var cypher = "MATCH (n:\(query.singularEntity)) "
+        cypher += try whereClauseFrom(query: query)
+        cypher += " RETURN n"
+
+        return cypher
+    }
+    
+    private static func whereClauseFrom<T: Entity>(query: Query<T>) throws -> String {
+        
+        if query.filters.count == 0 {
+            return ""
+        }
+        
+        var cypher = "WHERE"
+        
         var first = true
         for filter in query.filters {
             if first == false {
-                cypher += "AND "
+                cypher += " AND "
+            } else {
+                first = false
+                cypher += " "
             }
-
+            
             let condition = try Neo4jSerializer.condition(filter: filter)
-            cypher += condition + " "
-
-            first = false
+            cypher += condition
+            
         }
-        
-        cypher += "RETURN n"
+
         return cypher
     }
     
@@ -52,6 +116,10 @@ public class Neo4jSerializer {
         var condition: String
         switch filter.method {
         case let .compare(propertyName, comparison, node):
+            if propertyName == "id_string" {
+                print("Breakpoint")
+            }
+            
             condition = "n.\(propertyName)"
             switch comparison {
             case .equals:
@@ -74,15 +142,27 @@ public class Neo4jSerializer {
                 throw Error.notImplemented
             }
             
-            if let i = node.int, let d = node.double, Double(i) == d, node.bool == nil {
-                condition += "\(i)"
-            } else  if let n = node.double, node.bool == nil {
-                condition += "\(n)"
-            } else if let b = node.bool {
-                condition += "\(b)"
-            } else if let s = node.string {
-                condition += "\"\(s)\""
+            switch node {
+            case .null:
+                throw Error.notImplemented
+            case let .bool(value):
+                condition += "\(value)"
+            case let .number(value):
+                if Double(value.int) == value.double {
+                    condition += "\(value.int)"
+                } else {
+                    condition += "\(value.double)"
+                }
+            case let .string(value):
+                condition += "\"\(value)\""
+            case let .array(array):
+                throw Error.notImplemented
+            case let .object(object):
+                throw Error.notImplemented
+            case let .bytes(bytes):
+                throw Error.notImplemented
             }
+        
             
         case let .subset(string, scope, nodeArray):
             throw Error.notImplemented
@@ -145,9 +225,16 @@ public class Neo4jSerializer {
         return ""
     }
 
-    private static func modifyCypherQuery<T: Entity>(query: Query<T>) -> String {
+    private static func modifyCypherQuery<T: Entity>(query: Query<T>, idKey: String) throws -> String {
         
-        return ""
+        let idValue = "123"
+        var cypher = "MATCH (n:\(query.singularEntity) { \(idKey): '\(idValue)' }) WHERE "
+
+        // update data
+        
+        cypher += try whereClauseFrom(query: query)
+        
+        return cypher
     }
 
     public static func toParameters<T: Entity>(query: Query<T>) -> Dictionary<String, AnyObject> {
@@ -159,8 +246,22 @@ public class Neo4jSerializer {
 extension String {
     func capitalizingFirstLetter() -> String {
         let first = String(characters.prefix(1)).capitalized
-        let other = String(characters.dropFirst())
-        return first + other
+        let rest = String(characters.dropFirst())
+        return first + rest
+    }
+    
+    func pluralNameAsCapitalizedSingular() -> String {
+        
+        guard let lastChar = characters.last,
+            lastChar == Character("s") else {
+                return self
+        }
+        
+        let toIndex = index(startIndex, offsetBy: characters.count - 1)
+        let singularEntity = substring(to: toIndex)
+        
+        return singularEntity.capitalizingFirstLetter()
+        
     }
 }
 
@@ -168,14 +269,7 @@ public extension Query {
     public var singularEntity: String {
         get {
             let pluralEntity = self.entity
-            let index = pluralEntity.index(pluralEntity.startIndex, offsetBy: pluralEntity.characters.count - 1)
-            let singularEntity = pluralEntity.substring(to: index)
-            
-            return singularEntity.capitalizingFirstLetter()
-            
-            let first = String(singularEntity.characters.prefix(1)).capitalized
-            let rest = String(singularEntity.characters.dropFirst())
-            return first + rest
+            return pluralEntity.pluralNameAsCapitalizedSingular()
         }
     }
 }

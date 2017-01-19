@@ -34,11 +34,6 @@ class Neo4jDriverTests: XCTestCase {
  
 
     func testSaveAndFind() {
-//        try! database.create("posts") { creator in
-//            creator.id()
-//            creator.string("title")
-//            creator.string("text")
-//        }
         
         var post = Post(id: nil, title: "Vapor & Tests", text: "Lorem ipsum etc...")
         
@@ -50,9 +45,12 @@ class Neo4jDriverTests: XCTestCase {
         }
         
         do {
-            let fetched = try Post.find(1)
+            var fetched = try Post.find(1)
             XCTAssertEqual(fetched?.title, post.title)
             XCTAssertEqual(fetched?.text, post.text)
+            
+            fetched?.text = "Updated text"
+            try fetched?.save()
         } catch {
             XCTFail("Could not fetch user : \(error)")
         }
@@ -75,8 +73,8 @@ class Neo4jDriverTests: XCTestCase {
         let longNumericName = String(repeating: "1", count: 1000)
         do {
             var post = Post(id: nil,
-                            title: longNumericName,
-                            text: "Testing long number...")
+                            title: "Testing long number...",
+                            text: longNumericName)
             try post.save()
         } catch {
             XCTFail("Could not create post: \(error)")
