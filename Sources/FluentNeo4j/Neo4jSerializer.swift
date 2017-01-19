@@ -176,7 +176,7 @@ public class Neo4jSerializer {
 
     private static func createCypherQuery<T: Entity>(query: Query<T>, idKey: String) throws -> [String] {
         
-        var idValue = UUID().uuidString
+        let idValue = query.data?.object?[idKey] ?? UUID().uuidString
         var cypher = "CREATE (n:\(query.singularEntity) { \(idKey): '\(idValue)' "
 
         if let pairs = query.data?.object {

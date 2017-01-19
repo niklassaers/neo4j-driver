@@ -13,20 +13,47 @@ class Neo4jDriverTests: XCTestCase {
     var driver:Neo4jDriver!
     var database:Fluent.Database!
 
+    class func loadConfig() -> Config {
+        
+        let testPath = URL(fileURLWithPath: #file)
+            .deletingLastPathComponent().path
+        
+        let filePath = "\(testPath)/FluentNeo4j.json"
+        
+        return Config(pathToFile: filePath)
+    }
 
     override func setUp() {
+        
+        super.setUp()
+        
+        continueAfterFailure = false
+        
         do {
-            driver = try Neo4jDriver(host: "localhost", port: 7474, transferProtocol: .http, username: "neo4j", password: "stack0verFlow")
+            let config = Neo4jDriverTests.loadConfig()
+            driver = try Neo4jDriver(
+                host: config.hostname,
+                port: config.port,
+                transferProtocol: config.transferProtocol,
+                username: config.username,
+                password: config.password)
         } catch {
             XCTFail("Could not set up database \(error)")
         }
         
         database = Database(driver)
         Atom.database = database
+        Post.database = database
+    }
+    
+    func testEntityRevertAndPrepare() throws {
+        
         do {
             try Post.revert(database)
             try Post.prepare(database)
-            Post.database = database
+
+            try Atom.revert(database)
+            try Atom.prepare(database)
         } catch {
             XCTFail("Could not create table \(error)")
         }
@@ -35,11 +62,11 @@ class Neo4jDriverTests: XCTestCase {
 
     func testSaveAndFind() {
         
-        var post = Post(id: nil, title: "Vapor & Tests", text: "Lorem ipsum etc...")
+        let idNode = UUID().uuidString
+        var post = Post(id: Node.string(idNode), title: "Vapor & Tests", text: "Lorem ipsum etc...")
         
         do {
             try post.save()
-            print("Just saved")
         } catch {
             XCTFail("Could not save : \(error)")
         }

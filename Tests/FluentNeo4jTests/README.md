@@ -1,0 +1,1 @@
+To run tests, copy FluentNeo4j.json.example to FluentNeo4j.json and edit it with the appropriate connection settings

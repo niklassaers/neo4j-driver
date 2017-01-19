@@ -5,3 +5,4 @@ Packages
 Database
 *.xcodeproj
 database.db
+/Tests/FluentNeo4jTests/FluentNeo4j.json
