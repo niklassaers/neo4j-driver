@@ -11,13 +11,13 @@ struct Config {
     
     init(pathToFile: String) {
         
-        let jsonConfig: [String:String]
+        let jsonConfig: [String:Any]
         
         do {
             let filePathURL = URL(fileURLWithPath: pathToFile)
             let jsonData = try Data(contentsOf: filePathURL)
             let JSON = try JSONSerialization.jsonObject(with: jsonData, options: [])
-            jsonConfig = (JSON as? [String:String]) ?? [:]
+            jsonConfig = (JSON as? [String:Any]) ?? [:]
             
         } catch {
             print("Config loading failed from \(pathToFile)")
@@ -25,10 +25,10 @@ struct Config {
         }
         
             
-        self.username = jsonConfig["username"] ?? "neo4j"
-        self.password = jsonConfig["password"] ?? "neo4j"
-        self.hostname = jsonConfig["hostname"] ?? "localhost"
-        self.port     = jsonConfig["port"]?.uint ?? 7474
-        self.transferProtocol = Neo4jDriver.TransferProtocol.init(rawValue: jsonConfig["transferProtocol"] ?? "http") ?? .http
+        self.username = jsonConfig["username"] as? String ?? "neo4j"
+        self.password = jsonConfig["password"] as? String ?? "neo4j"
+        self.hostname = jsonConfig["hostname"] as? String ?? "localhost"
+        self.port     = (jsonConfig["port"] as? String)?.uint ?? 7474
+        self.transferProtocol = Neo4jDriver.TransferProtocol.init(rawValue: (jsonConfig["transferProtocol"] as? String) ?? "http") ?? .http
     }
 }

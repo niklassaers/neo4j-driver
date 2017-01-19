@@ -1,3 +1,4 @@
+
 import XCTest
 @testable import FluentNeo4j
 @testable import Fluent
@@ -62,8 +63,8 @@ class Neo4jDriverTests: XCTestCase {
 
     func testSaveAndFind() {
         
-        let idNode = UUID().uuidString
-        var post = Post(id: Node.string(idNode), title: "Vapor & Tests", text: "Lorem ipsum etc...")
+        let idValue = UUID().uuidString
+        var post = Post(id: Node.string(idValue), title: "Vapor & Tests", text: "Lorem ipsum etc...")
         
         do {
             try post.save()
@@ -72,7 +73,7 @@ class Neo4jDriverTests: XCTestCase {
         }
         
         do {
-            var fetched = try Post.find(1)
+            var fetched = try Post.find(idValue)
             XCTAssertEqual(fetched?.title, post.title)
             XCTAssertEqual(fetched?.text, post.text)
             

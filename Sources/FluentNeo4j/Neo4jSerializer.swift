@@ -137,7 +137,7 @@ public class Neo4jSerializer {
             
             if propertyName == idKey {
                 let value = node.string ?? "N/A"
-                condition += "\"\(value)\""
+                condition += "'\(value)'"
                 return condition
             }
             
@@ -153,7 +153,7 @@ public class Neo4jSerializer {
                     condition += "\(value.double)"
                 }
             case let .string(value):
-                condition += "\"\(value)\""
+                condition += "'\(value)'"
             case let .array(array):
                 throw Error.notImplemented
             case let .object(object):
@@ -177,7 +177,7 @@ public class Neo4jSerializer {
     private static func createCypherQuery<T: Entity>(query: Query<T>, idKey: String) throws -> [String] {
         
         let idValue = query.data?.object?[idKey] ?? UUID().uuidString
-        var cypher = "CREATE (n:\(query.singularEntity) { \(idKey): '\(idValue)' "
+        var cypher = "CREATE (n:\(query.singularEntity) { \(idKey): '\(idValue)'"
 
         if let pairs = query.data?.object {
             
