@@ -4,7 +4,7 @@ import Dispatch
 
 public class Neo4jDriver: Fluent.Driver {
 
-    public var idKey: String = "id_string"
+    public var idKey: String = "id"
 
     let database: Client
     

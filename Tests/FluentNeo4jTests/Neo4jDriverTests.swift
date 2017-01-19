@@ -99,8 +99,9 @@ class Neo4jDriverTests: XCTestCase {
       */
     func testLargeNumericInput() {
         let longNumericName = String(repeating: "1", count: 1000)
+        let id = UUID().uuidString
         do {
-            var post = Post(id: nil,
+            var post = Post(id: Fluent.Node.string(id),
                             title: "Testing long number...",
                             text: longNumericName)
             try post.save()
@@ -109,9 +110,9 @@ class Neo4jDriverTests: XCTestCase {
         }
         
         do {
-            let post = try Post.find(1)
+            let post = try Post.find(id)
             XCTAssertNotNil(post)
-            XCTAssertEqual(post?.title, longNumericName)
+            XCTAssertEqual(post?.text, longNumericName)
         } catch {
             XCTFail("Could not find post: \(error)")
         }

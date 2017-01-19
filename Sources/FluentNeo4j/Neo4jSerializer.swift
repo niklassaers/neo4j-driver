@@ -109,7 +109,7 @@ public class Neo4jSerializer {
         var condition: String
         switch filter.method {
         case let .compare(propertyName, comparison, node):
-            if propertyName == "id_string" {
+            if propertyName == "id" {
                 print("Breakpoint")
             }
             
@@ -176,7 +176,8 @@ public class Neo4jSerializer {
 
     private static func createCypherQuery<T: Entity>(query: Query<T>, idKey: String) throws -> [String] {
         
-        let idValue = query.data?.object?[idKey] ?? UUID().uuidString
+        let idValue = query.data?.object?[idKey]?.string ?? UUID().uuidString
+        print("Create \(idValue)")
         var cypher = "CREATE (n:\(query.singularEntity) { \(idKey): '\(idValue)'"
 
         if let pairs = query.data?.object {
