@@ -36,46 +36,55 @@ public class Neo4jDriver: Fluent.Driver {
     @discardableResult
     public func query<T: Entity>(_ query: Query<T>) throws -> Fluent.Node {
         
-        let cypher = try Neo4jSerializer.toCypher(query: query, idKey: idKey)
+        let queries = try Neo4jSerializer.toCypher(query: query, idKey: idKey)
         let params = Neo4jSerializer.toParameters(query: query)
         
         let dispatchGroup = DispatchGroup()
-        dispatchGroup.enter()
-
-        database.executeCypher(cypher, params: params) { (result, error) in
+        
+        for cypher in queries {
+            dispatchGroup.enter()
             
-            print("Running query Cypher: \n\(cypher)")
-            if error != nil {
-                print("Got error!")
+            database.executeCypher(cypher, params: params) { (result, error) in
+                
+                print("Running query Cypher: \n\(cypher)")
+                if error != nil {
+                    print("Got error!")
+                }
+                
+                dispatchGroup.leave()
             }
             
-            dispatchGroup.leave()
+            dispatchGroup.wait()
         }
-        
-        dispatchGroup.wait()
-        // How is it this function can expect to return synchronously?
         
         return .null
     }
 
     // While no explicit schema, this is a great time to make some indexes
     public func schema(_ schema: Schema) throws {
-        let cypher = try Neo4jSerializer.toCypher(schema: schema, idKey: idKey)
+        let queries = try Neo4jSerializer.toCypher(schema: schema, idKey: idKey)
 
         let dispatchGroup = DispatchGroup()
-        dispatchGroup.enter()
-        
-        database.executeCypher(cypher, params: nil) { (result, error) in
+        for cypher in queries {
+            dispatchGroup.enter()
             
-            print("Running schema Cypher: \n\(cypher)")
-            if error != nil {
-                print("Got error!")
+            database.executeCypher(cypher, params: nil) { (result, error) in
+                
+                print("Running schema Cypher: \n\(cypher)")
+                if error != nil {
+                    if cypher.hasPrefix("DROP INDEX ON ") ||
+                        cypher.hasPrefix("DROP CONSTRAINT ON ") {
+                        // Silently ignore a DROP INDEX/CONSTRAINT ON too much
+                    } else {
+                        print("Got error!")
+                    }
+                }
+                
+                dispatchGroup.leave()
             }
-
-            dispatchGroup.leave()
+            
+            dispatchGroup.wait()
         }
-        
-        dispatchGroup.wait()
         
     }
 

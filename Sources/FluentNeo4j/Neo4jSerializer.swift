@@ -11,11 +11,11 @@ public class Neo4jSerializer {
         case notImplemented
     }
     
-    public static func toCypher<T: Entity>(query: Query<T>, idKey: String) throws -> String {
+    public static func toCypher<T: Entity>(query: Query<T>, idKey: String) throws -> [String] {
         
         switch query.action {
         case .fetch:
-            return try fetchCypherQuery(query: query)
+            return try fetchCypherQuery(query: query, idKey: idKey)
         case .count:
             return countCypherQuery(query: query)
         case .delete:
@@ -29,18 +29,18 @@ public class Neo4jSerializer {
 
     }
     
-    public static func toCypher(schema: Schema, idKey: String) throws -> String {
+    public static func toCypher(schema: Schema, idKey: String) throws -> [String] {
         
         
         switch schema {
         case let .create(entity, create):
             let label = entity.pluralNameAsCapitalizedSingular()
-            var cypher = "CREATE INDEX ON :\(label)(\(idKey));\n"
-            cypher += "CREATE CONSTRAINT ON (n:\(label)) ASSERT n.\(idKey) IS UNIQUE;\n"
+            var cypher = ["CREATE INDEX ON :\(label)(\(idKey))"]
+            cypher.append("CREATE CONSTRAINT ON (n:\(label)) ASSERT n.\(idKey) IS UNIQUE")
 
             for field in create {
                 if field.unique == true {
-                    cypher += "CREATE CONSTRAINT ON (n:\(label)) ASSERT n.\(field.name) IS UNIQUE;\n"
+                    cypher.append("CREATE CONSTRAINT ON (n:\(label)) ASSERT n.\(field.name) IS UNIQUE")
                 }
             }
             
@@ -48,22 +48,15 @@ public class Neo4jSerializer {
             
         case let .modify(entity, create, delete):
             let label = entity.pluralNameAsCapitalizedSingular()
-            var cypher = ""
+            var cypher = [String]()
 
-            /*
-             // I would have liked to remove constraints, but that leads to errors if they do not exist. I cannot query if they do exist already
-             // For now, I guess we should query what indexes we have first and then go on and delete based on that
-             
-            for field in delete {
-                if field.unique == true {
-                    cypher += "DROP CONSTRAINT ON (n:\(label)) ASSERT n.\(field.name) IS UNIQUE;\n"
-                }
+            for name in delete {
+                cypher += "DROP CONSTRAINT ON (n:\(label)) ASSERT n.\(name) IS UNIQUE;\n"
             }
-            */
 
             for field in create {
                 if field.unique == true {
-                    cypher += "CREATE CONSTRAINT ON (n:\(label)) ASSERT n.\(field.name) IS UNIQUE;\n"
+                    cypher.append("CREATE CONSTRAINT ON (n:\(label)) ASSERT n.\(field.name) IS UNIQUE")
                 }
             }
             
@@ -71,23 +64,23 @@ public class Neo4jSerializer {
             
         case let .delete(entity):
             let label = entity.pluralNameAsCapitalizedSingular()
-            var cypher = "MATCH (n:\(label)) DETACH DELETE n;\n"
-            cypher += "DROP INDEX ON :\(label)(\(idKey))"
+            var cypher = ["MATCH (n:\(label)) DETACH DELETE n"]
+            cypher.append("DROP INDEX ON :\(label)(\(idKey))")
 
             return cypher
         }
     }
     
-    private static func fetchCypherQuery<T: Entity>(query: Query<T>) throws -> String {
+    private static func fetchCypherQuery<T: Entity>(query: Query<T>, idKey: String) throws -> [String] {
         
         var cypher = "MATCH (n:\(query.singularEntity)) "
-        cypher += try whereClauseFrom(query: query)
+        cypher += try whereClauseFrom(query: query, idKey: idKey)
         cypher += " RETURN n"
 
-        return cypher
+        return [cypher]
     }
     
-    private static func whereClauseFrom<T: Entity>(query: Query<T>) throws -> String {
+    private static func whereClauseFrom<T: Entity>(query: Query<T>, idKey: String) throws -> String {
         
         if query.filters.count == 0 {
             return ""
@@ -104,7 +97,7 @@ public class Neo4jSerializer {
                 cypher += " "
             }
             
-            let condition = try Neo4jSerializer.condition(filter: filter)
+            let condition = try Neo4jSerializer.condition(filter: filter, idKey: idKey)
             cypher += condition
             
         }
@@ -112,7 +105,7 @@ public class Neo4jSerializer {
         return cypher
     }
     
-    private static func condition(filter: Filter) throws -> String {
+    private static func condition(filter: Filter, idKey: String) throws -> String {
         var condition: String
         switch filter.method {
         case let .compare(propertyName, comparison, node):
@@ -140,6 +133,12 @@ public class Neo4jSerializer {
                 throw Error.notImplemented
             case .contains:
                 throw Error.notImplemented
+            }
+            
+            if propertyName == idKey {
+                let value = node.string ?? "N/A"
+                condition += "\"\(value)\""
+                return condition
             }
             
             switch node {
@@ -175,7 +174,7 @@ public class Neo4jSerializer {
         return condition
     }
 
-    private static func createCypherQuery<T: Entity>(query: Query<T>) throws -> String {
+    private static func createCypherQuery<T: Entity>(query: Query<T>) throws -> [String] {
         
         var cypher = "CREATE (n:\(query.singularEntity) { "
 
@@ -212,29 +211,29 @@ public class Neo4jSerializer {
         }
         cypher += "})"
         
-        return cypher
+        return [cypher]
     }
 
-    private static func deleteCypherQuery<T: Entity>(query: Query<T>) -> String {
+    private static func deleteCypherQuery<T: Entity>(query: Query<T>) -> [String] {
         
-        return ""
+        return []
     }
 
-    private static func countCypherQuery<T: Entity>(query: Query<T>) -> String {
+    private static func countCypherQuery<T: Entity>(query: Query<T>) -> [String] {
         
-        return ""
+        return []
     }
 
-    private static func modifyCypherQuery<T: Entity>(query: Query<T>, idKey: String) throws -> String {
+    private static func modifyCypherQuery<T: Entity>(query: Query<T>, idKey: String) throws -> [String] {
         
         let idValue = "123"
         var cypher = "MATCH (n:\(query.singularEntity) { \(idKey): '\(idValue)' }) WHERE "
 
         // update data
         
-        cypher += try whereClauseFrom(query: query)
+        cypher += try whereClauseFrom(query: query, idKey: idKey)
         
-        return cypher
+        return [cypher]
     }
 
     public static func toParameters<T: Entity>(query: Query<T>) -> Dictionary<String, AnyObject> {
