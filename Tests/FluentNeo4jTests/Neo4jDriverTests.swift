@@ -43,8 +43,13 @@ class Neo4jDriverTests: XCTestCase {
         }
         
         database = Database(driver)
-        Atom.database = database
+        
         Post.database = database
+
+        Atom.database = database
+        Compound.database = database
+        Pivot<Atom, Compound>.database = database
+
     }
     
     func testEntityRevertAndPrepare() throws {
@@ -55,6 +60,12 @@ class Neo4jDriverTests: XCTestCase {
 
             try Atom.revert(database)
             try Atom.prepare(database)
+
+            try Compound.revert(database)
+            try Compound.prepare(database)
+            
+            try Pivot<Atom, Compound>.revert(database)
+            try Pivot<Atom, Compound>.prepare(database)
         } catch {
             XCTFail("Could not create table \(error)")
         }
@@ -63,8 +74,11 @@ class Neo4jDriverTests: XCTestCase {
 
     func testSaveAndFind() {
         
-        let idValue = UUID().uuidString
-        var post = Post(id: Node.string(idValue), title: "Vapor & Tests", text: "Lorem ipsum etc...")
+        let postIdValue = UUID().uuidString
+        let postTitle = "Vapor & Tests"
+        let postText = "Lorem ipsum etc..."
+        
+        var post = Post(id: Node.string(postIdValue), title: postTitle, text: postText)
         
         do {
             try post.save()
@@ -73,21 +87,62 @@ class Neo4jDriverTests: XCTestCase {
         }
         
         do {
-            var fetched = try Post.find(idValue)
-            XCTAssertEqual(fetched?.title, post.title)
-            XCTAssertEqual(fetched?.text, post.text)
-            
-            fetched?.text = "Updated text"
+            let fetched = try Post.find(postIdValue)
+            XCTAssertEqual(fetched?.title, postTitle)
+            XCTAssertEqual(fetched?.text, postText)
+        } catch {
+            XCTFail("Could not fetch post : \(error)")
+        }
+    }
+    
+    func testDontFindNonexistantNode() {
+    
+        do {
+            let post  = try Post.find(UUID().uuidString)
+            XCTAssertNil(post)
+        } catch {
+            XCTFail("Unexpectantly found post: \(error)")
+        }
+    }
+    
+    func testSaveAndUpdate() {
+        
+        let postIdValue = UUID().uuidString
+        let postTitle = "Vapor & Tests"
+        let postText = "Lorem ipsum etc..."
+        let updatedPostText = "Updated text"
+        
+        var post = Post(id: Node.string(postIdValue), title: postTitle, text: postText)
+        
+        do {
+            try post.save()
+        } catch {
+            XCTFail("Could not save : \(error)")
+        }
+        
+        var fetched: Post? = nil
+        do {
+            fetched = try Post.find(postIdValue)
+            XCTAssertEqual(fetched?.title, postTitle)
+            XCTAssertEqual(fetched?.text, postText)
+        } catch {
+            XCTFail("Could not fetch post : \(error)")
+        }
+
+        do {
+            XCTAssertNotNil(fetched, "Node should be defined at this point")
+            fetched?.text = updatedPostText
             try fetched?.save()
         } catch {
-            XCTFail("Could not fetch user : \(error)")
+            XCTFail("Could not save post: \(error)")
         }
         
         do {
-            let post  = try Post.find(2)
-            XCTAssertNil(post)
+            fetched = try Post.find(postIdValue)
+            XCTAssertEqual(fetched?.title, postTitle)
+            XCTAssertEqual(fetched?.text, updatedPostText)
         } catch {
-            XCTFail("Could not find post: \(error)")
+            XCTFail("Could not find updated post: \(error)")
         }
         
         
@@ -118,5 +173,31 @@ class Neo4jDriverTests: XCTestCase {
         }
         
     }
+    
+    func testJoins() throws {
+        
+        var hydrogen = Atom(name: "Hydrogen", protons: 1)
+        try hydrogen.save()
+
+        var oxygen = Atom(name: "Oxygen", protons: 8)
+        try oxygen.save()
+        
+        var water = Compound(name: "Water")
+        try water.save()
+        var hydrogenWater = Pivot<Atom, Compound>(hydrogen, water)
+        try hydrogenWater.save()
+        var oxygenWater = Pivot<Atom, Compound>(oxygen, water)
+        try oxygenWater.save()
+        
+        var sugar = Compound(name: "Sugar")
+        try sugar.save()
+        var hydrogenSugar = Pivot<Atom, Compound>(hydrogen, sugar)
+        try hydrogenSugar.save()
+        
+        
+        let compounds = try hydrogen.compounds().all()
+        XCTAssertEqual(compounds.count, 2)
+    }
+
     
 }

@@ -9,6 +9,7 @@ public class Neo4jSerializer {
     
     public enum Error: Swift.Error {
         case notImplemented
+        case identifierMissing
     }
     
     public static func toCypher<T: Entity>(query: Query<T>, idKey: String) throws -> [String] {
@@ -222,12 +223,40 @@ public class Neo4jSerializer {
 
     private static func modifyCypherQuery<T: Entity>(query: Query<T>, idKey: String) throws -> [String] {
         
-        let idValue = "123"
-        var cypher = "MATCH (n:\(query.singularEntity) { \(idKey): '\(idValue)' }) WHERE "
-
-        // update data
+        guard let idValue = query.data?[idKey]?.string else {
+            throw Error.identifierMissing
+        }
         
-        cypher += try whereClauseFrom(query: query, idKey: idKey)
+        var cypher = "MATCH (n:\(query.singularEntity) { \(idKey): '\(idValue)' })"
+        if let data = query.data?.object {
+            cypher += " SET "
+            var first = false
+            for (key, node) in data {
+                if first == false {
+                    first = true
+                } else {
+                    cypher += ", "
+                }
+                
+                let lastPart: String
+                
+                if let i = node.int, let d = node.double, Double(i) == d, node.bool == nil {
+                    lastPart = "\(i)"
+                } else  if let n = node.double, node.bool == nil {
+                    lastPart = "\(n)"
+                } else if let b = node.bool {
+                    lastPart = "\(b)"
+                } else if let s = node.string {
+                    lastPart = "'\(s)'" // TODO: Escape 's'
+                } else {
+                    throw Error.notImplemented
+                }
+
+                cypher += "n.\(key) = \(lastPart)"
+            }
+        }
+
+        cypher += " RETURN n"
         
         return [cypher]
     }
